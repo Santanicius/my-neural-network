@@ -11,25 +11,13 @@ dataframe = None
 st.write("""# My Neural network""")
 st.caption("An application of Multilayer Perceptron and backpropagation")
 
-def getMode(type):
-    if type == 'Linear':
-        return 0
-    if type == 'Logística':
-        return 1
-    if type == 'Hiperbólica':
-        return 2
-    else:
-        return 0
-
 @st.cache
-def run_mlp(data_train, data_test, learning, epochs=200, error=0.1, mode='Linear', n_hiddens=1):
-    mlp = Network(epochs=int(epochs), error=float(error), mode=int(mode), n_hiddens=n_hiddens, learning_rate=learning)
-    if mlp.train(data_train):
-        errors = mlp.l
-        acc, confusion_mat = mlp.test(data_test)
-        return confusion_mat, acc, errors;
-    else:;
-        st.subheader("--- ERRO AO TREINAR A REDE ---")
+def run_mlp(data_train, data_test, n_hiddens = 1, learning=0.01, epochs=200, error=0.1, out_mode='Linear'):
+    mlp = Network(epoch=epochs, error_rate=error, n_hiddens=n_hiddens, output_mode=out_mode, learning_rate=learning)
+    mlp.train(data_train)
+    errors = mlp.listErrors
+    accuracy, confusion_mat = mlp.test(data_test)
+    return confusion_mat, accuracy, errors
 
 ## Setup GUI
 
@@ -57,10 +45,10 @@ with linha3[0]:
     epochs_num = st.number_input('Número de épocas:', min_value=100, step=100)
 with linha3[1]:
     # Função de transferência
-    transfer_function = st.radio("Função de transferência",('Linear', 'Logística', 'Hiperbólica'))
+    transfer_function = st.radio("Função de transferência",('Linear', 'Logistica', 'Hiperbólica'))
 
 st.text("                                                              ")
-st.text("                                                              ")WW
+st.text("                                                              ")
 st.text("                                                              ")
 
 linha2 = st.columns((1,1))
@@ -91,7 +79,7 @@ elif not(train_file is None) and not(test_file is None):
     for col in columns_train:
         with checkbox_row[i]:
             i = i + 1
-            checkbox.append({"checked": st.checkbox(col, value=1, key=col, help="Select or no this attribute to use in network"), "attribute": col})
+            checkbox.append({"checked": st.checkbox(col, value=1, key=col, help="Selecione ou não esse atributo para usar na rede"), "attribute": col})
        
     
     for check in checkbox:
@@ -111,10 +99,10 @@ elif not(train_file is None) and not(test_file is None):
         confusin_matrix, accuracy, errors = run_mlp(data_test=dataframe_test,
                                                     data_train=dataframe_train,
                                                     n_hiddens=hidden_layer,
-                                                    error=error_rate,
                                                     learning=learning_rate,
                                                     epochs=epochs_num,
-                                                    mode=getMode(transfer_function))
+                                                    error=error_rate,
+                                                    out_mode=transfer_function)
         st.line_chart(data=errors)
         st.subheader("Matriz de Confusão")
         st.dataframe(data=confusin_matrix)
