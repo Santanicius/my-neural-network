@@ -5,11 +5,11 @@ import numpy as np
 from random import seed
 from random import randrange
 from random import random
-
+from sklearn.model_selection import train_test_split
 
 class Network:
 
-    def __init__(self, learning_rate=0.5, epoch=100, n_hiddens=1, error_rate=0.5, output_mode='Logistics'):
+    def __init__(self, learning_rate=0.5, epoch=100, n_hiddens=1, error_rate=0.5, output_mode='Hyperbolic'):
         seed(1)
         self.learning_rate = learning_rate
         self.epoch = epoch
@@ -27,28 +27,37 @@ class Network:
         return math.floor(math.sqrt((float(inputs * outputs))))
 
     def initialize(self, dataf):
-        for col in dataf.drop(columns="classe", axis=1):
-            dataf[str(col)] = dataf[str(col)].astype(float)
+        dataf = dataf.apply(pd.to_numeric, errors='coerce')
+        
+        # Fanzendo o shuffle
+        dataf = dataf.sample(frac=1)
+        
+        # Tranformando o dataframe em lista
         self.input = dataf.values.tolist()
 
         self.n_inputs = len(self.input[0]) - 1
-
-        last = len(self.input[0]) - 1
-
-        classlist = [row[last] for row in self.input]
-        self.n_outputs = len(set(classlist))
+        
+        classlist = set(self.input[self.n_inputs])
+        
+        self.n_outputs = len(classlist)
         self.dic_encode = dict()
-        for i, value in enumerate(set(classlist)):
-            self.dic_encode[value] = i
+        
+        """
+            for i, value in enumerate(classlist):
+                self.dic_encode[value] = i 
 
-        for row in self.input:
-            row[last] = self.dic_encode[row[last]]
+            for row in self.input:
+                row[self.n_inputs] = self.dic_encode[row[self.n_inputs]]
+        """
+        
         if self.n_hiddens == 0 or self.n_hiddens == 1:
-            self.n_hiddens = self.geometric_mean(self.n_inputs, self.n_outputs)
-        self.shuffle()
+            self.n_hiddens = math.floor((self.n_inputs + self.n_outputs) / 2)
+            
+        # self.shuffle()
         self.normalization()
 
     def shuffle(self):
+        # Fazendo uma copia da lista de entradas
         temp = list(self.input)
         self.input = list()
         while len(temp) > 0:
@@ -59,17 +68,21 @@ class Network:
         state = [[min(col), max(col)] for col in zip(*self.input)]
         for row in self.input:
             for i in range(len(row) - 1):
-                row[i] = (row[i] - state[i][0]) / (state[i][1] - state[i][0])
-
+                if (state[i][1] - state[i][0]) != 0:
+                    row[i] = (row[i] - state[i][0]) / (state[i][1] - state[i][0])
+                
+                
+    # Arquitetura da Rede
     def init_network(self):
         self.network = list()
+        # +1 por conta Com o Bias
         hidden = [{'W': [random() for _ in range(self.n_inputs + 1)]} for _ in range(self.n_hiddens)]
         self.network.append(hidden)
         output = [{'W': [random() for _ in range(self.n_hiddens + 1)]} for _ in range(self.n_outputs)]
         self.network.append(output)
 
     def activate(self, weight, inputs):
-        act = weight[-1]
+        act = weight[-1] #talvez substituir por 1
         for i in range(len(weight) - 1):
             act += weight[i] * inputs[i]
         return act
@@ -94,13 +107,14 @@ class Network:
             x = self.output_function(value)
             return x * (1.0 - x)
         else:
-            return 1.0 - (self.output_function(value) ** 2)
+            return (1.0 - (math.tanh(value) ** 2))
 
     def forward_propagate(self, row):
         temp_inputs = row
         for layer in self.network:
             news = list()
             for neuron in layer:
+                # Poderia realizar a multiplicação de matriz no lugar
                 act = self.activate(neuron['W'], temp_inputs)
                 neuron['OUTPUT'] = self.output_function(act)
                 news.append(neuron['OUTPUT'])
@@ -142,18 +156,19 @@ class Network:
         epochs = 0
         while (self.error_rate < error) & (self.epoch > epochs):
             error = 0
+            i = 0
             for row in self.input:
                 outs = self.forward_propagate(row)
                 expected = np.zeros(self.n_outputs)
                 expected[row[-1]] = 1
-                error += sum([(expected[i] - outs[i]) ** 2 for i in range(len(expected))])
-                self.backward_propagate_error(expected)
-                self.update_weights(row)
-            if epochs % 100 == 0:
-                print("> epoch={:.4f}, error={:.4f}".format(epochs, error/len(self.input)))
+                if i % 2625 == 0: 
+                    error += sum([(expected[i] - outs[i]) ** 2 for i in range(len(expected))])
+                    self.backward_propagate_error(expected)
+                    self.update_weights(row)
+                i = i + 1
+            print("> epoch={:.4f}, error={:.4f}".format(epochs, np.float(error/len(self.input))))
             self.listErrors.append(error)
             epochs += 1
-
     def prediction(self, row):
         outputs = self.forward_propagate(row)
         return outputs.index(max(outputs))
@@ -179,15 +194,21 @@ class Network:
             predicted.append(self.prediction(row))
         fact = [row[-1] for row in self.input]
         return self.accuracy(fact, predicted, list_encode)
-    
+        return e_x / e_x.sum()
+
+data_frame = pd.read_csv("dataset/mnist_784.csv")
+train, test = train_test_split(data_frame, train_size=0.8)
+
+mlp = Network(learning_rate=0.02, error_rate=0.01, output_mode='tanh', epoch=20)
+print("Iniciando o treinamento :3")
+print(f"\n\nLength Hidden Layer => {(len(data_frame)+10)/2}\n")
+
+mlp.train(train)
+acc, mat_conf = mlp.test(test)
 
 
-# mlp = Network(learning_rate=0.02, error_rate=0.0001, output_mode='Linear', n_hiddens=1, epoch=2000)
-# mlp.train(pd.read_csv("dataset/base_treinamento.csv"))
-# acc, df = mlp.test(pd.read_csv("dataset/base_teste.csv"))
-
-# print("Treinamento Concluido")
-# print("\n\nAcurárcia = ",acc,"\nMatriz de Confusão:\n", df)
+print("Treinamento Concluido")
+print(f"\n\nAcurárcia = {acc} \nMatriz de Confusão:\n{mat_conf}")
 
 
 
