@@ -1,4 +1,3 @@
-
 import pandas as pd
 import math
 import numpy as np
@@ -29,6 +28,7 @@ class Network:
     def initialize(self, dataf):
         dataf = dataf.apply(pd.to_numeric, errors='coerce')
         
+                
         # Fanzendo o shuffle
         dataf = dataf.sample(frac=1)
         
@@ -37,18 +37,19 @@ class Network:
 
         self.n_inputs = len(self.input[0]) - 1
         
-        classlist = set(self.input[self.n_inputs])
+        # Pegando a lista de classe ordenada
+        classlist = sorted(list(dataf['class'].unique()))
         
+        # Criando o dicionario de classificação
         self.n_outputs = len(classlist)
         self.dic_encode = dict()
         
-        """
-            for i, value in enumerate(classlist):
-                self.dic_encode[value] = i 
-
-            for row in self.input:
-                row[self.n_inputs] = self.dic_encode[row[self.n_inputs]]
-        """
+        for i, value in enumerate(classlist):
+            self.dic_encode[value] = i
+            
+        for row in self.input:
+            row[self.n_inputs] = self.dic_encode[row[self.n_inputs]]
+            
         
         if self.n_hiddens == 0 or self.n_hiddens == 1:
             self.n_hiddens = math.floor((self.n_inputs + self.n_outputs) / 2)
@@ -76,15 +77,17 @@ class Network:
     def init_network(self):
         self.network = list()
         # +1 por conta Com o Bias
-        hidden = [{'W': [random() for _ in range(self.n_inputs + 1)]} for _ in range(self.n_hiddens)]
+        hidden = [{'W': [random() for _ in range(self.n_inputs+1)]} for _ in range(self.n_hiddens)]
         self.network.append(hidden)
-        output = [{'W': [random() for _ in range(self.n_hiddens + 1)]} for _ in range(self.n_outputs)]
+        
+        hidden2 = [{'W': [random() for _ in range(self.n_hiddens)]} for _ in range(self.n_hiddens)]
+        self.network.append(hidden2)
+        
+        output = [{'W': [random() for _ in range(self.n_hiddens)]} for _ in range(self.n_outputs)]
         self.network.append(output)
 
     def activate(self, weight, inputs):
-        act = weight[-1] #talvez substituir por 1
-        for i in range(len(weight) - 1):
-            act += weight[i] * inputs[i]
+        act = np.dot(weight, inputs)
         return act
 
     def output_function(self, value):
@@ -110,7 +113,10 @@ class Network:
             return (1.0 - (math.tanh(value) ** 2))
 
     def forward_propagate(self, row):
-        temp_inputs = row
+        temp_inputs = list(row)
+        
+        # Fazemos a classe virar o bias
+        temp_inputs[-1] = 1
         for layer in self.network:
             news = list()
             for neuron in layer:
@@ -156,17 +162,21 @@ class Network:
         epochs = 0
         while (self.error_rate < error) & (self.epoch > epochs):
             error = 0
-            i = 0
+            error_per_batch = 0
+            i = 1
             for row in self.input:
                 outs = self.forward_propagate(row)
                 expected = np.zeros(self.n_outputs)
                 expected[row[-1]] = 1
-                if i % 2625 == 0: 
-                    error += sum([(expected[i] - outs[i]) ** 2 for i in range(len(expected))])
+                if i % 32 == 0:
+                    error += error_per_batch/32
+                    error_per_batch = 0
                     self.backward_propagate_error(expected)
                     self.update_weights(row)
+                else:
+                    error_per_batch += sum([(expected[i] - outs[i]) ** 2 for i in range(len(expected))])
                 i = i + 1
-            print("> epoch={:.4f}, error={:.4f}".format(epochs, np.float(error/len(self.input))))
+            print("> epoch={:.4f}, error={:.4f}".format(epochs, float(error/len(self.input))))
             self.listErrors.append(error)
             epochs += 1
     def prediction(self, row):
@@ -194,22 +204,32 @@ class Network:
             predicted.append(self.prediction(row))
         fact = [row[-1] for row in self.input]
         return self.accuracy(fact, predicted, list_encode)
-        return e_x / e_x.sum()
 
-data_frame = pd.read_csv("dataset/mnist_784.csv")
-train, test = train_test_split(data_frame, train_size=0.8)
+    def show_att(self):
+      print("{ ",
+                self.learning_rate, ",\n",
+                self.n_inputs, ",\n",
+                self.n_outputs,",\n",
+                self.listErrors,",\n",
+                self.network,",\n",
+                self.input,",\n",
+                self.dic_encode,",\n",
+                self.error_rate,",\n",
+                self.out_mode,
+            "\n}"
+            )
 
-mlp = Network(learning_rate=0.02, error_rate=0.01, output_mode='tanh', epoch=20)
+data = pd.read_csv("dataset/mnist_784.csv")
+data20, _ = train_test_split(data, train_size=0.2)
+train, test = train_test_split(data20, train_size=0.8)
+
+mlp = Network(learning_rate=0.002, error_rate=0.01, output_mode='tanh', n_hiddens=20, epoch=100)
+mlp.show_att()
 print("Iniciando o treinamento :3")
-print(f"\n\nLength Hidden Layer => {(len(data_frame)+10)/2}\n")
 
 mlp.train(train)
 acc, mat_conf = mlp.test(test)
 
 
 print("Treinamento Concluido")
-print(f"\n\nAcurárcia = {acc} \nMatriz de Confusão:\n{mat_conf}")
-
-
-
-
+print(f"\n\nAcurácia = {acc} \nMatriz de Confusão:\n{mat_conf}")
