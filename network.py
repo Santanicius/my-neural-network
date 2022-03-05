@@ -5,6 +5,7 @@ from random import seed
 from random import randrange
 from random import random
 from sklearn.model_selection import train_test_split
+import time
 
 class Network:
 
@@ -220,16 +221,20 @@ class Network:
             )
 
 data = pd.read_csv("dataset/mnist_784.csv")
-data20, _ = train_test_split(data, train_size=0.2)
-train, test = train_test_split(data20, train_size=0.8)
+train, test = train_test_split(data, train_size=0.8)
+#train, test = train_test_split(data20, train_size=0.8)
 
-mlp = Network(learning_rate=0.002, error_rate=0.01, output_mode='tanh', n_hiddens=20, epoch=100)
-mlp.show_att()
+mlp = Network(learning_rate=0.009, error_rate=0.01, output_mode='tanh', n_hiddens=25, epoch=50)
+# mlp.show_att()
 print("Iniciando o treinamento :3")
+
+inicio = time.time()
 
 mlp.train(train)
 acc, mat_conf = mlp.test(test)
 
+fim = time.time()
 
-print("Treinamento Concluido")
+tempo = fim - inicio
+print(f"Treinamento e Teste Concluído\nTempo de execução: {tempo}")
 print(f"\n\nAcurácia = {acc} \nMatriz de Confusão:\n{mat_conf}")
